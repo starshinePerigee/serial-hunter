@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "serial-hunter"
+#dynamic = ["version"]
+version = "0.0.1"
+
+dependencies = [
+    "pyserial >= 3.1"
+]
+requires-python = ">=3.8"
+
+authors = [{ name = "Starshine", email = "thethingwith.feaths@gmail.com" }]
+description = "A library and command line utitilty for finding serial devices connected to systems with too many serial ports."
+readme = "README.md"
+license = { file = "LICENSE" }
+classifiers = [
+#    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Development Status :: 1 - Planning",
+    "Environment :: Console"
+    "Topic :: System :: Hardware",
+    "Topic :: Utilities"
+]
+keywords = ["serial", "serial ports", "pyserial", "serial hunter"]
+
+[project.optional-dependencies]
+dev = ["black", "pytest"]
+
+[project.urls]
+Homepage = "https://github.com/starshinePerigee/serial-hunter"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

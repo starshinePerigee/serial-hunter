@@ -1,2 +1,2 @@
 # serial-hunter
-A command line utitilty to find and confirm which serial ports your serial devices are connected to
+A library and command line utitilty for finding serial devices connected to systems with too many serial ports.

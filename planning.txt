@@ -1,0 +1,15 @@
+workflow:
+
+on init, we create a SerialPort object for every serial port
+
+serial ports can also be added manually
+
+each operation runs on every serial port
+
+you can always filter by the results of an operation (or the inverse) - and there's a flag on each command
+to immediately apply that filter
+
+
+features:
+
+run commands from a file
