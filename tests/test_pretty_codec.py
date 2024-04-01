@@ -1,6 +1,7 @@
 import pytest
 
-from serialhunter import x_code_escape_errors
+import serialhunter
+from serialhunter.pretty_unicode_codec import decode_pretty, encode_pretty
 
 
 @pytest.fixture
@@ -29,3 +30,27 @@ class TestXCodeEscapeErrors:
         encoded_str = bad_str.encode("ascii", "uxreplace")
         assert b"0123456789x0001f40b0123456789" in encoded_str
         assert b"this is a unicode string" in encoded_str
+
+
+@pytest.fixture
+def every_byte_pair():
+    return b"".join([i.to_bytes(1, "little") for i in range(256)])
+
+
+@pytest.fixture
+def every_ascii_string(every_byte_pair):
+    return every_byte_pair[:128].decode("ascii")
+
+
+class TestEncodeDecodeMapping:
+    def test_encode_coverage(self, every_ascii_string):
+        encoded = encode_pretty(every_ascii_string)
+        assert b"abcd" in encoded
+        assert b"\n" in encoded
+        assert len(every_ascii_string) == len(encoded)
+
+    def test_decode_coverage(self, every_byte_pair):
+        decoded = decode_pretty(every_byte_pair)
+        assert "abcd" in decoded
+        assert "\n" in decoded
+        assert serialhunter.BYTESTRING_CHARACTER + "ff" in decoded

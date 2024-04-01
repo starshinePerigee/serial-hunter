@@ -7,6 +7,8 @@ This is mostly for use with the pretty unicode codec, to make reading raw serial
 from typing import Union, Tuple
 import codecs
 
+from serialhunter import BYTESTRING_CHARACTER
+
 
 def x_code_escape_errors(
     e: Union[UnicodeDecodeError, UnicodeEncodeError]
@@ -16,7 +18,7 @@ def x_code_escape_errors(
         # re-encoding with backslashreplace isn't great for performance
         # but also I'm not sure if this code path will ever get used?
 
-        cross_char = "˟".encode(e.encoding, errors="ignore")
+        cross_char = BYTESTRING_CHARACTER.encode(e.encoding, errors="ignore")
         if not cross_char:
             cross_char = b"x"
 
@@ -24,7 +26,7 @@ def x_code_escape_errors(
         re_encoded_str = re_encoded_str.replace(b"\\U", cross_char)
         return re_encoded_str, e.end
 
-    sub = "˟" + e.object[e.start : e.end].hex().upper()
+    sub = BYTESTRING_CHARACTER + e.object[e.start : e.end].hex().upper()
     return sub, e.end
 
 
