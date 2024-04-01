@@ -14,22 +14,26 @@ replacing port-dependent "newline" with os.newline
 Reference https://pymotw.com/3/codecs/index.html#defining-a-custom-encoding
 """
 
+from typing import Union
 import codecs
 
 
-def unicode_x_escape_errors(e: UnicodeDecodeError):
-    sub = "˟" + e.object[e.start : e.end].hex()
+def x_code_escape_errors(e: Union[UnicodeDecodeError, UnicodeEncodeError]):
+    if isinstance(e.object, str):
+        # we are encoding a string
+        # re-encoding with backslashreplace isn't great for performance
+        # but also I'm not sure if this code path will ever get used?
+
+        cross_char = "˟".encode(e.encoding, errors="ignore")
+        if not cross_char:
+            cross_char = b"x"
+
+        re_encoded_str = e.object.encode(e.encoding, errors="backslashreplace")
+        re_encoded_str = re_encoded_str.replace(b"\\U", cross_char)
+        return re_encoded_str, e.end
+
+    sub = "˟" + e.object[e.start : e.end].hex().upper()
     return sub, e.end
 
 
-codecs.register_error("uxreplace", unicode_x_escape_errors)
-
-
-if __name__ == "__main__":
-    str1 = "this is a bad character: 0123456789".encode("ascii")
-    str2 = "0123456789".encode("ascii")
-    bad_char = (129).to_bytes(1, "little")
-
-    bad_str = str1 + bad_char + str2
-
-    print(bad_str.decode("ascii", "uxreplace"))
+codecs.register_error("uxreplace", x_code_escape_errors)
