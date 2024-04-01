@@ -10,6 +10,22 @@ you can always filter by the results of an operation (or the inverse) - and ther
 to immediately apply that filter
 
 
+drop / add / filter / clear / undo / reset / save / load / get all
+set parameters (on one, all, or active)
+
+command target payload
+
+active (default)
+! inverts
+p: previous
+c: current
+a: all
+r: regex
+s: specific
+
+all can use quotes (or not!)
+
+
 features:
 
 run commands from a file
