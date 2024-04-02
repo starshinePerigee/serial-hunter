@@ -17,6 +17,7 @@ For valid ascii, encode("prettyascii") == encode("ascii") except for line termin
 """
 
 import codecs
+from typing import Tuple
 
 from serialhunter import BYTESTRING_CHARACTER, NEWLINE_CHARACTER
 
@@ -57,12 +58,14 @@ char_to_bytes = {
 }
 
 
-def encode_pretty(data: str, errors="strict") -> bytes:
+def encode_pretty(
+    data: str,
+    skip_next=False,
+    skip_newlines=False,
+    escape_count=0,
+) -> Tuple[bytes, bool, bool, int]:
     """Convert a string (possibly containing prettified values) into bytes"""
     out_bytes = bytes()
-    skip_next = False
-    skip_newlines = False
-    escape_count = 0
     escape_buffer = ""
     for i, c in enumerate(data):
         if skip_next:
@@ -109,12 +112,11 @@ def encode_pretty(data: str, errors="strict") -> bytes:
 
         out_bytes += char_to_bytes[c]
 
-    return out_bytes
+    return out_bytes, skip_next, skip_newlines, escape_count
 
 
-def decode_pretty(data: bytes, errors="strict") -> str:
+def decode_pretty(data: bytes, was_newline=False) -> Tuple[str, bool]:
     out_str = ""
-    was_newline = False
     # time_since_last_break = 0
     for b in data:
         is_newline = b in (10, 13)
@@ -131,92 +133,103 @@ def decode_pretty(data: bytes, errors="strict") -> str:
         was_newline = is_newline
 
         out_str += next_chars
-    return out_str
+    return out_str, was_newline
 
 
-#
-#
-# class Codec(codecs.Codec):
-#     def encode(self, data, errors="strict"):
-#         """'40 41 42' -> b'@ab'"""
-#         return serial.to_bytes([int(h, 16) for h in data.split()])
-#
-#     def decode(self, data, errors="strict"):
-#         """b'@ab' -> '40 41 42'"""
-#         return unicode(
-#             "".join("{:02X} ".format(ord(b)) for b in serial.iterbytes(data))
-#         )
-#
-#
-# class IncrementalEncoder(codecs.IncrementalEncoder):
-#     """Incremental hex encoder"""
-#
-#     def __init__(self, errors="strict"):
-#         self.errors = errors
-#         self.state = 0
-#
-#     def reset(self):
-#         self.state = 0
-#
-#     def getstate(self):
-#         return self.state
-#
-#     def setstate(self, state):
-#         self.state = state
-#
-#     def encode(self, data, final=False):
-#         """\
-#         Incremental encode, keep track of digits and emit a byte when a pair
-#         of hex digits is found. The space is optional unless the error
-#         handling is defined to be 'strict'.
-#         """
-#         state = self.state
-#         encoded = []
-#         for c in data.upper():
-#             if c in HEXDIGITS:
-#                 z = HEXDIGITS.index(c)
-#                 if state:
-#                     encoded.append(z + (state & 0xF0))
-#                     state = 0
-#                 else:
-#                     state = 0x100 + (z << 4)
-#             elif c == " ":  # allow spaces to separate values
-#                 if state and self.errors == "strict":
-#                     raise UnicodeError("odd number of hex digits")
-#                 state = 0
-#             else:
-#                 if self.errors == "strict":
-#                     raise UnicodeError("non-hex digit found: {!r}".format(c))
-#         self.state = state
-#         return serial.to_bytes(encoded)
-#
-#
-# class IncrementalDecoder(codecs.IncrementalDecoder):
-#     """Incremental decoder"""
-#
-#     def decode(self, data, final=False):
-#         return unicode(
-#             "".join("{:02X} ".format(ord(b)) for b in serial.iterbytes(data))
-#         )
-#
-#
-# class StreamWriter(Codec, codecs.StreamWriter):
-#     """Combination of hexlify codec and StreamWriter"""
-#
-#
-# class StreamReader(Codec, codecs.StreamReader):
-#     """Combination of hexlify codec and StreamReader"""
-#
-#
-# def getregentry():
-#     """encodings module API"""
-#     return codecs.CodecInfo(
-#         name="hexlify",
-#         encode=hex_encode,
-#         decode=hex_decode,
-#         incrementalencoder=IncrementalEncoder,
-#         incrementaldecoder=IncrementalDecoder,
-#         streamwriter=StreamWriter,
-#         streamreader=StreamReader,
-#         # ~ _is_text_encoding=True,
-#     )
+def encode_pretty_fn(data: str, errors: "strict"):
+    return encode_pretty(data)[0], len(data)
+
+
+def decode_pretty_fn(data: bytes, errors: "strict"):
+    return decode_pretty(data)[0], len(data)
+
+
+class PrettyCodec(codecs.Codec):
+    def encode(self, data, errors="strict"):
+        return encode_pretty(data)
+
+    def decode(self, data, errors="strict"):
+        return decode_pretty(data)
+
+
+class PrettyIncrementalEncoder(codecs.IncrementalEncoder):
+    """Handles byte streams incrementally (byte by byte) with state management"""
+
+    def __init__(self, errors="strict"):
+        super().__init__(errors)
+        self.skip_next = False
+        self.skip_newlines = False
+        self.escape_count = 0
+
+    def reset(self):
+        self.skip_next = False
+        self.skip_newlines = False
+        self.escape_count = 0
+
+    def getstate(self):
+        # reminder that since getstate and setstate must return int, we have to do some packing here:
+        return (
+            "",
+            int(self.skip_next) + int(self.skip_newlines) * 2 + self.escape_count * 4,
+        )
+
+    def setstate(self, state: tuple):
+        buffer_, statevars = state
+        self.skip_next = bool(statevars % 2)
+        self.skip_newlines = bool((statevars // 2) % 4)
+        self.escape_count = statevars // 4
+
+    def encode(self, data, final=False):
+        return_bytes, self.skip_next, self.skip_newlines, self.escape_count = (
+            encode_pretty(data, self.skip_next, self.skip_newlines, self.escape_count)
+        )
+        if final and self.escape_count:
+            raise RuntimeError(
+                "Error decoding - final escape character not followed by two valid hex characters!"
+            )
+        return return_bytes
+
+
+class PrettyIncrementalDecoder(codecs.IncrementalDecoder):
+    def __init__(self, errors="strict"):
+        super().__init__(errors)
+        self.was_newline = False
+
+    def reset(self):
+        self.was_newline = False
+
+    def getstate(self):
+        return b"", int(self.was_newline)
+
+    def setstate(self, state):
+        buffer_, statevars = state
+        self.was_newline = bool(statevars)
+
+    def decode(self, data, final=False):
+        return_str, self.was_newline = decode_pretty(data, self.was_newline)
+        return return_str
+
+
+class StreamWriter(PrettyCodec, codecs.StreamWriter):
+    """Implement a StreamWriter via multiple inheritance"""
+
+    pass
+
+
+class StreamReader(PrettyCodec, codecs.StreamReader):
+    pass
+
+
+def getregentry():
+    return codecs.CodecInfo(
+        name="prettyascii",
+        encode=encode_pretty_fn,
+        decode=decode_pretty_fn,
+        incrementalencoder=PrettyIncrementalEncoder,
+        incrementaldecoder=PrettyIncrementalDecoder,
+        streamwriter=StreamWriter,
+        streamreader=StreamReader,
+    )
+
+
+codecs.register(lambda c: getregentry() if c == "prettyascii" else None)

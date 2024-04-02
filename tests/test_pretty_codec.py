@@ -59,24 +59,32 @@ def every_ascii_string(every_byte_pair):
 
 class TestEncodeDecodeMapping:
     def test_encode_coverage(self, every_ascii_string):
-        encoded = encode_pretty(every_ascii_string)
+        encoded = encode_pretty(every_ascii_string)[0]
         assert b"abcd" in encoded
         assert b"\n" in encoded
         assert len(every_ascii_string) == len(encoded)
 
     def test_decode_coverage(self, every_byte_pair):
-        decoded = decode_pretty(every_byte_pair)
+        decoded = decode_pretty(every_byte_pair)[0]
         assert "abcd" in decoded
         assert "\n" in decoded
         assert serialhunter.BYTESTRING_CHARACTER + "ff" in decoded
 
     def test_decode_encode(self, every_byte_pair):
-        twisted_str = encode_pretty(decode_pretty(every_byte_pair))
+        twisted_str = encode_pretty(decode_pretty(every_byte_pair)[0])[0]
         assert twisted_str == mangle_newlines(every_byte_pair)
 
     def test_encode_decode(self, every_ascii_string):
         """Unlike encoding decoded data, decoding encoded data is nonreversible - because the whole point
         of pretty codec is replacing ugly characters with unicode equivalents. Still, it shouldn't barf.
         """
-        twisted_str = decode_pretty(encode_pretty(every_ascii_string))
+        twisted_str = decode_pretty(encode_pretty(every_ascii_string)[0])[0]
         assert "ABCDEFGHIJKLMNOPQRSTUVWXYZ" in twisted_str
+
+
+class TestPrettyCodec:
+    def test_encode_codec(self, every_ascii_string):
+        encoded = every_ascii_string.encode("prettyascii", "uxreplace")
+        assert b"abcd" in encoded
+        assert b"\n" in encoded
+        assert len(every_ascii_string) == len(encoded)
