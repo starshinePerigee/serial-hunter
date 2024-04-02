@@ -66,6 +66,7 @@ def encode_pretty(data: str, errors="strict") -> bytes:
     escape_buffer = ""
     for i, c in enumerate(data):
         if skip_next:
+            skip_next = False
             continue
 
         # check for line continuation:
@@ -77,6 +78,7 @@ def encode_pretty(data: str, errors="strict") -> bytes:
         if c in ["\r", "\n", "␍", "␊"]:
             if not skip_newlines:
                 out_bytes += b"\n"
+                skip_newlines = True
             continue
         skip_newlines = False
 
@@ -113,15 +115,15 @@ def encode_pretty(data: str, errors="strict") -> bytes:
 def decode_pretty(data: bytes, errors="strict") -> str:
     out_str = ""
     was_newline = False
-    time_since_last_break = 0
+    # time_since_last_break = 0
     for b in data:
         is_newline = b in (10, 13)
         next_chars = byte_to_chars[b]
 
-        time_since_last_break += len(next_chars)
-        if time_since_last_break >= COLUMN_WIDTH:
-            out_str += NEWLINE_CHARACTER + "\n"
-            time_since_last_break = 0
+        # time_since_last_break += len(next_chars)
+        # if time_since_last_break >= COLUMN_WIDTH:
+        #     out_str += NEWLINE_CHARACTER + "\n"
+        #     time_since_last_break = 0
 
         if not is_newline and was_newline:
             out_str += "\n"

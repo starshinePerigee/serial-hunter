@@ -1,7 +1,22 @@
 import pytest
 
+from typing import Union
+
 import serialhunter
 from serialhunter.pretty_unicode_codec import decode_pretty, encode_pretty
+
+
+def mangle_newlines(data: Union[str, bytes]) -> Union[str, bytes]:
+    """
+    Pretty unicode is not reversible, because it converts all newlines to \n and eats sequential newlines.
+    This isn't a perfect replication, but it's close enough for most test cases
+    """
+
+    hack_r = "\r"
+    hack_n = "\n"
+    if isinstance(data, bytes):
+        hack_r, hack_n = (c.encode("ascii") for c in (hack_r, hack_n))
+    return data.replace(hack_r, hack_n).replace(hack_n + hack_n, hack_n)
 
 
 @pytest.fixture
@@ -54,3 +69,14 @@ class TestEncodeDecodeMapping:
         assert "abcd" in decoded
         assert "\n" in decoded
         assert serialhunter.BYTESTRING_CHARACTER + "ff" in decoded
+
+    def test_decode_encode(self, every_byte_pair):
+        twisted_str = encode_pretty(decode_pretty(every_byte_pair))
+        assert twisted_str == mangle_newlines(every_byte_pair)
+
+    def test_encode_decode(self, every_ascii_string):
+        """Unlike encoding decoded data, decoding encoded data is nonreversible - because the whole point
+        of pretty codec is replacing ugly characters with unicode equivalents. Still, it shouldn't barf.
+        """
+        twisted_str = decode_pretty(encode_pretty(every_ascii_string))
+        assert "ABCDEFGHIJKLMNOPQRSTUVWXYZ" in twisted_str
